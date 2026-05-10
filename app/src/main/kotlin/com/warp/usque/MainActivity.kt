@@ -60,12 +60,13 @@ class MainActivity : Activity() {
     private lateinit var appListContainer: LinearLayout
     private lateinit var appCountText: TextView
     private lateinit var connectButton: MaterialButton
-    private lateinit var disconnectButton: MaterialButton
     private lateinit var defaultBtn: MaterialButton
+    private lateinit var homeProfileSpinner: Spinner
+    private lateinit var currentProfileText: TextView
     private lateinit var profileSpinner: Spinner
     private lateinit var profileNameInput: TextInputEditText
-    private lateinit var saveProfileBtn: MaterialButton
-    private lateinit var applyProfileBtn: MaterialButton
+    private lateinit var saveNewProfileBtn: MaterialButton
+    private lateinit var overwriteProfileBtn: MaterialButton
     private lateinit var deleteProfileBtn: MaterialButton
     private lateinit var languageZhButton: MaterialButton
     private lateinit var languageEnButton: MaterialButton
@@ -77,6 +78,7 @@ class MainActivity : Activity() {
     private var vpnGranted = false
     private var configDirty = false
     private var appsLoaded = false
+    private var suppressProfileSelection = false
     private var currentPageIndex = 0
     private var pageSwitcher: ((Int) -> Unit)? = null
     private var swipeDownX = 0f
@@ -221,11 +223,10 @@ class MainActivity : Activity() {
             portInput.setText(parseEndpointPort(defaultEndpoint, 443).toString())
             refreshState(tr("已读取默认 endpoint", "Default endpoint loaded"))
         }
-        saveProfileBtn.setOnClickListener { saveCurrentProfile() }
-        applyProfileBtn.setOnClickListener { applySelectedProfile() }
+        saveNewProfileBtn.setOnClickListener { saveAsNewProfile() }
+        overwriteProfileBtn.setOnClickListener { overwriteSelectedProfile() }
         deleteProfileBtn.setOnClickListener { deleteSelectedProfile() }
-        connectButton.setOnClickListener { connectVpn() }
-        disconnectButton.setOnClickListener { disconnectVpn() }
+        connectButton.setOnClickListener { if (vpnRunning) disconnectVpn() else connectVpn() }
         sniInput.addTextChangedListener(dirtyWatcher())
         endpointInput.addTextChangedListener(dirtyWatcher())
         portInput.addTextChangedListener(dirtyWatcher())
@@ -270,6 +271,10 @@ class MainActivity : Activity() {
             setTypeface(null, Typeface.BOLD)
             setPadding(0, 0, 0, dp(10))
         }
+        homeProfileSpinner = Spinner(this).apply {
+            background = round(surface, dp(16), outline)
+            setPadding(dp(10), 0, dp(10), 0)
+        }
         connectButton = MaterialButton(this).apply {
             text = tr("连接 VPN", "Connect VPN")
             textSize = 15f
@@ -282,25 +287,13 @@ class MainActivity : Activity() {
             minHeight = dp(52)
             isAllCaps = false
         }
-        disconnectButton = MaterialButton(this).apply {
-            text = tr("断开 VPN", "Disconnect VPN")
-            textSize = 15f
-            gravity = Gravity.CENTER
-            setSingleLine(false)
-            maxLines = 2
-            setTextColor(Color.rgb(255, 255, 255))
-            backgroundTintList = android.content.res.ColorStateList.valueOf(mango)
-            cornerRadius = dp(24)
-            minHeight = dp(52)
-            isAllCaps = false
-        }
         val actionRow = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         actionRow.addView(connectButton, LinearLayout.LayoutParams(-1, dp(52)))
-        actionRow.addView(disconnectButton, LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(8) })
         heroBox.addView(eyebrow)
         heroBox.addView(statusBanner)
         heroBox.addView(statusText)
         heroBox.addView(speedText)
+        heroBox.addView(homeProfileSpinner, LinearLayout.LayoutParams(-1, dp(42)).apply { bottomMargin = dp(10) })
         heroBox.addView(actionRow)
         hero.addView(heroBox)
         content.addView(hero, LinearLayout.LayoutParams(-1, -2))
@@ -351,16 +344,16 @@ class MainActivity : Activity() {
         val profileBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(10), dp(14), dp(10)) }
         profileSpinner = Spinner(this).apply { background = round(surface2, dp(16), outline); setPadding(dp(10), 0, dp(10), 0) }
         profileNameInput = input(tr("配置名称", "Profile Name"), tr("例如：Visa 500 / Cloudflare 443", "e.g. Visa 500 / Cloudflare 443"))
-        saveProfileBtn = secondaryButton(tr("保存为配置方案", "Save Profile"))
-        applyProfileBtn = secondaryButton(tr("应用选中方案", "Apply Profile"))
+        saveNewProfileBtn = secondaryButton(tr("保存为新方案", "Save as New"))
+        overwriteProfileBtn = secondaryButton(tr("覆盖当前方案", "Overwrite Current"))
         deleteProfileBtn = secondaryButton(tr("删除选中方案", "Delete Profile"))
         profileBox.addView(TextView(this).apply { text = tr("配置方案", "Profiles"); textSize = 18f; setTextColor(textColor); setTypeface(null, Typeface.BOLD) })
         profileBox.addView(TextView(this).apply { text = tr("保存当前 SNI / Endpoint / Port，后面可以直接切换。", "Save current SNI / Endpoint / Port for quick switching."); textSize = 12f; setTextColor(subText); setPadding(0, dp(2), 0, dp(6)) })
         profileBox.addView(profileSpinner, LinearLayout.LayoutParams(-1, dp(42)))
         profileBox.addView(inputWrap(tr("配置名称", "Profile Name"), profileNameInput), LinearLayout.LayoutParams(-1, dp(70)).apply { topMargin = dp(5) })
         val profileActions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        profileActions.addView(applyProfileBtn, LinearLayout.LayoutParams(0, dp(42), 1f).apply { rightMargin = dp(8) })
-        profileActions.addView(saveProfileBtn, LinearLayout.LayoutParams(0, dp(42), 1f))
+        profileActions.addView(overwriteProfileBtn, LinearLayout.LayoutParams(0, dp(42), 1f).apply { rightMargin = dp(8) })
+        profileActions.addView(saveNewProfileBtn, LinearLayout.LayoutParams(0, dp(42), 1f))
         profileBox.addView(profileActions, LinearLayout.LayoutParams(-1, dp(48)))
         profileBox.addView(deleteProfileBtn, LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(5) })
         profileCard.addView(profileBox)
@@ -574,29 +567,109 @@ class MainActivity : Activity() {
         prefs.edit().putString("profilesJson", arr.toString()).apply()
     }
     private fun refreshProfileSpinner() {
-        if (!::profileSpinner.isInitialized) return
         val names = profiles.keys.toList()
-        profileSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, names)
+        if (::profileSpinner.isInitialized) {
+            profileSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, names)
+            val current = currentProfileName().takeIf { profiles.containsKey(it) } ?: names.firstOrNull().orEmpty()
+            if (current.isNotBlank()) profileSpinner.setSelection(names.indexOf(current).coerceAtLeast(0), false)
+            profileSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    val name = names.getOrNull(position) ?: return
+                    loadProfileForEditing(name)
+                }
+                override fun onNothingSelected(parent: AdapterView<*>?) {}
+            }
+        }
+        refreshHomeProfileSpinner()
+    }
+    private fun refreshHomeProfileSpinner() {
+        if (!::homeProfileSpinner.isInitialized) return
+        val names = profiles.keys.toList()
+        suppressProfileSelection = true
+        homeProfileSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, names)
+        val current = currentProfileName().takeIf { profiles.containsKey(it) } ?: names.firstOrNull().orEmpty()
+        if (current.isNotBlank()) homeProfileSpinner.setSelection(names.indexOf(current).coerceAtLeast(0), false)
+        suppressProfileSelection = false
+        homeProfileSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (suppressProfileSelection) return
+                val name = names.getOrNull(position) ?: return
+                switchHomeProfile(name)
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+        updateCurrentProfileUi()
     }
     private fun selectedProfileName(): String = profileSpinner.selectedItem?.toString().orEmpty()
-    private fun saveCurrentProfile() {
-        val name = profileNameInput.text?.toString().orEmpty().trim().ifBlank { normalizedEndpoint() }
-        profiles[name] = Triple(sniInput.text?.toString().orEmpty().ifBlank { "www.visa.cn" }, normalizedEndpointHost(), normalizedPort())
-        persistProfiles(); refreshProfileSpinner(); profileNameInput.setText(name); toast(tr("已保存配置方案", "Profile saved"))
+    private fun currentProfileName(): String = prefs.getString("currentProfileName", "")?.orEmpty() ?: ""
+    private fun setCurrentProfileName(name: String) { prefs.edit().putString("currentProfileName", name).apply() }
+    private fun updateCurrentProfileUi() {
+        if (!::currentProfileText.isInitialized) return
+        val name = currentProfileName().takeIf { it.isNotBlank() } ?: profiles.keys.firstOrNull().orEmpty()
+        val p = profiles[name]
+        currentProfileText.text = if (p != null) {
+            tr("当前配置：$name · SNI ${p.first} · ${p.second}:${p.third}", "Current: $name · SNI ${p.first} · ${p.second}:${p.third}")
+        } else {
+            tr("当前配置：未选择", "Current profile: none")
+        }
     }
-    private fun applySelectedProfile() {
-        val name = selectedProfileName()
-        val p = profiles[name] ?: return toast(tr("没有可用配置", "No profile available"))
+    private fun syncConfigProfileSpinner(name: String) {
+        if (!::profileSpinner.isInitialized) return
+        val names = profiles.keys.toList()
+        val index = names.indexOf(name)
+        if (index >= 0) profileSpinner.setSelection(index, false)
+    }
+    private fun switchHomeProfile(name: String) {
+        if (!profiles.containsKey(name)) return
+        if (vpnRunning) {
+            refreshHomeProfileSpinner()
+            toast(tr("请先断开 VPN，再切换配置", "Disconnect VPN before switching profile"))
+            return
+        }
+        applyProfileToInputs(name, persist = true)
+        setCurrentProfileName(name)
+        syncConfigProfileSpinner(name)
+        updateCurrentProfileUi()
+        toast(tr("已切换配置：$name", "Profile switched: $name"))
+    }
+    private fun applyProfileToInputs(name: String, persist: Boolean) {
+        val p = profiles[name] ?: return
         sniInput.setText(p.first)
         endpointInput.setText(p.second)
         portInput.setText(p.third.toString())
         profileNameInput.setText(name)
-        markDirty(); saveInputs(); toast(tr("已应用并保存：$name", "Applied and saved: $name"))
+        if (persist) { markDirty(); saveInputs() }
+    }
+    private fun saveAsNewProfile() {
+        val base = profileNameInput.text?.toString().orEmpty().trim().ifBlank { normalizedEndpoint() }
+        val name = uniqueProfileName(base)
+        profiles[name] = Triple(sniInput.text?.toString().orEmpty().ifBlank { "www.visa.cn" }, normalizedEndpointHost(), normalizedPort())
+        persistProfiles(); refreshProfileSpinner(); profileNameInput.setText(name); syncConfigProfileSpinner(name); toast(tr("已保存为新方案：$name", "Saved as new profile: $name"))
+    }
+    private fun overwriteSelectedProfile() {
+        val selected = selectedProfileName()
+        val name = selected.ifBlank { profileNameInput.text?.toString().orEmpty().trim() }
+        if (name.isBlank()) return toast(tr("请先选择一个方案", "Select a profile first"))
+        profiles[name] = Triple(sniInput.text?.toString().orEmpty().ifBlank { "www.visa.cn" }, normalizedEndpointHost(), normalizedPort())
+        persistProfiles(); refreshProfileSpinner(); profileNameInput.setText(name); syncConfigProfileSpinner(name)
+        if (currentProfileName() == name) { setCurrentProfileName(name); refreshHomeProfileSpinner(); updateCurrentProfileUi() }
+        toast(tr("已覆盖当前方案：$name", "Current profile overwritten: $name"))
+    }
+    private fun loadProfileForEditing(name: String) {
+        if (!profiles.containsKey(name)) return
+        applyProfileToInputs(name, persist = false)
+    }
+    private fun uniqueProfileName(base: String): String {
+        if (!profiles.containsKey(base)) return base
+        var index = 2
+        while (profiles.containsKey("$base $index")) index++
+        return "$base $index"
     }
     private fun deleteSelectedProfile() {
         val name = selectedProfileName()
         if (name.isBlank()) return
         profiles.remove(name)
+        if (currentProfileName() == name) setCurrentProfileName(profiles.keys.firstOrNull().orEmpty())
         persistProfiles(); refreshProfileSpinner(); toast("已删除：$name")
     }
 
@@ -608,8 +681,9 @@ class MainActivity : Activity() {
         sniInput.setText(prefs.getString("sni", "www.visa.cn") ?: "www.visa.cn")
         selectedPackages.clear(); selectedPackages.addAll(prefs.getStringSet("selectedPackages", emptySet()) ?: emptySet())
         splitModeSwitch.isChecked = prefs.getBoolean("splitMode", false)
+        if (currentProfileName().isBlank() && profiles.isNotEmpty()) setCurrentProfileName(profiles.keys.first())
         configDirty = false
-        updateConfigState(); updateModeUi()
+        updateConfigState(); updateModeUi(); refreshHomeProfileSpinner(); updateCurrentProfileUi()
     }
 
     private fun ensureAppsLoaded() {
@@ -730,14 +804,10 @@ class MainActivity : Activity() {
         statusBanner.text = state
         statusText.text = "${tr("状态", "Status")}: $state${if (extra.isNotBlank()) " · $extra" else ""}"
         statusBanner.setTextColor(if (vpnRunning) green else onPrimary)
-        connectButton.text = tr("连接 VPN", "Connect VPN")
-        disconnectButton.text = tr("断开 VPN", "Disconnect VPN")
+        connectButton.text = if (vpnRunning) tr("断开 VPN", "Disconnect VPN") else tr("连接 VPN", "Connect VPN")
         val dark = android.content.res.ColorStateList.valueOf(darkAccent)
-        val light = android.content.res.ColorStateList.valueOf(mango)
-        connectButton.backgroundTintList = if (vpnRunning) light else dark
-        disconnectButton.backgroundTintList = if (vpnRunning) dark else light
-        connectButton.setTextColor(if (vpnRunning) onPrimary else Color.WHITE)
-        disconnectButton.setTextColor(if (vpnRunning) Color.WHITE else onPrimary)
+        connectButton.backgroundTintList = dark
+        connectButton.setTextColor(Color.WHITE)
         if (::languageZhButton.isInitialized) {
             languageZhButton.backgroundTintList = android.content.res.ColorStateList.valueOf(if (!useEnglish) darkAccent else primary)
             languageEnButton.backgroundTintList = android.content.res.ColorStateList.valueOf(if (useEnglish) darkAccent else primary)
