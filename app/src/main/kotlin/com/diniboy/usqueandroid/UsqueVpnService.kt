@@ -1,4 +1,4 @@
-package com.diniboy.usqueandroid
+package com.warp.usque
 
 import android.app.Service
 import android.content.Intent
@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class UsqueVpnService : VpnService() {
     companion object {
-        const val ACTION_STOP = "com.diniboy.usqueandroid.STOP_VPN"
+        const val ACTION_STOP = "com.warp.usque.STOP_VPN"
         private const val TAG = "UsqueVpnService"
         @Volatile private var activeService: UsqueVpnService? = null
 
