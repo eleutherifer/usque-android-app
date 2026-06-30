@@ -343,7 +343,7 @@ class MainActivity : Activity() {
         val profileCard = card()
         val profileBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(10), dp(14), dp(10)) }
         profileSpinner = Spinner(this).apply { background = round(surface2, dp(16), outline); setPadding(dp(10), 0, dp(10), 0) }
-        profileNameInput = input(tr("配置名称", "Profile Name"), tr("例如：Visa 500 / Cloudflare 443", "e.g. Visa 500 / Cloudflare 443"))
+        profileNameInput = input(tr("配置名称", "Profile Name"), tr("例如：Yandex 443 / Cloudflare 8443", "e.g. Yandex 443 / Cloudflare 8443"))
         saveNewProfileBtn = secondaryButton(tr("保存为新方案", "Save as New"))
         overwriteProfileBtn = secondaryButton(tr("覆盖当前方案", "Overwrite Current"))
         deleteProfileBtn = secondaryButton(tr("删除选中方案", "Delete Profile"))
@@ -362,9 +362,9 @@ class MainActivity : Activity() {
         content.addView(sectionTitle(tr("当前连接参数", "Current Connection")))
         val config = card()
         val configBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(8), dp(14), dp(8)) }
-        sniInput = input("SNI", "www.visa.cn")
+        sniInput = input("SNI", "yandex.run")
         endpointInput = input("Endpoint IP", "162.159.198.2")
-        portInput = input("Connect Port", "500")
+        portInput = input("Connect Port", "443")
         defaultBtn = secondaryButton(tr("读取默认 endpoint", "Load Default Endpoint"))
         configBox.addView(compactInputWrap("SNI", sniInput))
         configBox.addView(compactInputWrap("Endpoint IP", endpointInput))
@@ -549,12 +549,12 @@ class MainActivity : Activity() {
             val arr = JSONArray(raw)
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
-                profiles[o.getString("name")] = Triple(o.optString("sni", "www.visa.cn"), o.optString("endpoint", "162.159.198.2"), o.optInt("port", 500))
+                profiles[o.getString("name")] = Triple(o.optString("sni", "yandex.ru"), o.optString("endpoint", "162.159.198.2"), o.optInt("port", 443))
             }
         }
         if (profiles.isEmpty()) {
-            profiles["默认 500"] = Triple("www.visa.cn", "162.159.198.2", 500)
-            profiles["备用 443"] = Triple("www.visa.cn", "162.159.198.2", 443)
+            profiles["默认 443"] = Triple("yandex.ru", "162.159.198.2", 443)
+            profiles["备用 8443"] = Triple("yandex.ru", "162.159.198.2", 8443)
             persistProfiles()
         }
         refreshProfileSpinner()
@@ -643,14 +643,14 @@ class MainActivity : Activity() {
     private fun saveAsNewProfile() {
         val base = profileNameInput.text?.toString().orEmpty().trim().ifBlank { normalizedEndpoint() }
         val name = uniqueProfileName(base)
-        profiles[name] = Triple(sniInput.text?.toString().orEmpty().ifBlank { "www.visa.cn" }, normalizedEndpointHost(), normalizedPort())
+        profiles[name] = Triple(sniInput.text?.toString().orEmpty().ifBlank { "yandex.ru" }, normalizedEndpointHost(), normalizedPort())
         persistProfiles(); refreshProfileSpinner(); profileNameInput.setText(name); syncConfigProfileSpinner(name); toast(tr("已保存为新方案：$name", "Saved as new profile: $name"))
     }
     private fun overwriteSelectedProfile() {
         val selected = selectedProfileName()
         val name = selected.ifBlank { profileNameInput.text?.toString().orEmpty().trim() }
         if (name.isBlank()) return toast(tr("请先选择一个方案", "Select a profile first"))
-        profiles[name] = Triple(sniInput.text?.toString().orEmpty().ifBlank { "www.visa.cn" }, normalizedEndpointHost(), normalizedPort())
+        profiles[name] = Triple(sniInput.text?.toString().orEmpty().ifBlank { "yandex.ru" }, normalizedEndpointHost(), normalizedPort())
         persistProfiles(); refreshProfileSpinner(); profileNameInput.setText(name); syncConfigProfileSpinner(name)
         if (currentProfileName() == name) { setCurrentProfileName(name); refreshHomeProfileSpinner(); updateCurrentProfileUi() }
         toast(tr("已覆盖当前方案：$name", "Current profile overwritten: $name"))
@@ -675,10 +675,10 @@ class MainActivity : Activity() {
 
     private fun loadSavedState() {
         loadProfiles()
-        val saved = prefs.getString("endpoint", "162.159.198.2:500") ?: "162.159.198.2:500"
+        val saved = prefs.getString("endpoint", "162.159.198.2:443") ?: "162.159.198.2:443"
         endpointInput.setText(parseEndpointHost(saved))
-        portInput.setText(prefs.getInt("connectPort", parseEndpointPort(saved, 500)).toString())
-        sniInput.setText(prefs.getString("sni", "www.visa.cn") ?: "www.visa.cn")
+        portInput.setText(prefs.getInt("connectPort", parseEndpointPort(saved, 443)).toString())
+        sniInput.setText(prefs.getString("sni", "yandex.ru") ?: "yandex.ru")
         selectedPackages.clear(); selectedPackages.addAll(prefs.getStringSet("selectedPackages", emptySet()) ?: emptySet())
         splitModeSwitch.isChecked = prefs.getBoolean("splitMode", false)
         if (currentProfileName().isBlank() && profiles.isNotEmpty()) setCurrentProfileName(profiles.keys.first())
@@ -842,7 +842,7 @@ class MainActivity : Activity() {
         vpnGranted = true; startTunnelNow()
     }
     private fun startTunnelNow() {
-        val sni = sniInput.text?.toString().orEmpty().ifBlank { "www.visa.cn" }
+        val sni = sniInput.text?.toString().orEmpty().ifBlank { "yandex.ru" }
         val endpoint = "${normalizedEndpointHost()}:${normalizedPort()}"
         val splitMode = splitModeSwitch.isChecked
         val allowedApps = if (splitMode) selectedPackagesForVpn() else arrayListOf()
@@ -868,7 +868,7 @@ class MainActivity : Activity() {
     }
     private fun onTunnelStopped(msg: String) { vpnRunning = false; refreshState(msg); log(msg) }
     private fun normalizedEndpointHost(): String = parseEndpointHost(endpointInput.text?.toString().orEmpty().trim().ifBlank { "162.159.198.2" }).ifBlank { "162.159.198.2" }
-    private fun normalizedPort(): Int = (portInput.text?.toString().orEmpty().trim().toIntOrNull() ?: parseEndpointPort(endpointInput.text?.toString().orEmpty(), 500)).coerceIn(1, 65535)
+    private fun normalizedPort(): Int = (portInput.text?.toString().orEmpty().trim().toIntOrNull() ?: parseEndpointPort(endpointInput.text?.toString().orEmpty(), 443)).coerceIn(1, 65535)
     private fun normalizedEndpoint(): String = "${normalizedEndpointHost()}:${normalizedPort()}"
     private fun parseEndpointHost(value: String): String { val v = value.trim(); if (v.isBlank()) return "162.159.198.2"; if (v.startsWith("[") && v.contains("]")) return v.substringAfter("[").substringBefore("]"); return if (v.count { it == ':' } == 1) v.substringBefore(':') else v }
     private fun parseEndpointPort(value: String, fallback: Int): Int { val v = value.trim(); val p = when { v.startsWith("[") && v.contains("]:") -> v.substringAfter("]:"); v.count { it == ':' } == 1 -> v.substringAfter(':'); else -> "" }; return p.toIntOrNull()?.takeIf { it in 1..65535 } ?: fallback }
