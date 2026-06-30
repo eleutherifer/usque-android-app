@@ -111,7 +111,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        title = "Usque"
+        title = "Usque RU"
         useEnglish = prefs.getBoolean("useEnglish", false)
         buildUi()
         loadSavedState()
@@ -161,7 +161,7 @@ class MainActivity : Activity() {
             setBackgroundColor(bg)
         }
         val toolbar = MaterialToolbar(this).apply {
-            title = "Usque"
+            title = "Usque RU"
             subtitle = null
             setTitleTextColor(textColor)
             setSubtitleTextColor(subText)
@@ -198,7 +198,7 @@ class MainActivity : Activity() {
         val homePage = buildHomePage()
         val configPage = buildConfigPage()
         val appsPage = buildAppsPage()
-        val titles = listOf("Usque", tr("连接配置", "Connection Config"), tr("选择应用", "Select Apps"))
+        val titles = listOf("Usque RU", tr("连接配置", "Connection Config"), tr("选择应用", "Select Apps"))
         val pages = listOf(homePage, configPage, appsPage)
         fun showIndex(index: Int) {
             val safe = index.coerceIn(0, pages.lastIndex)

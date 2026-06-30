@@ -84,7 +84,7 @@ class UsqueVpnService : VpnService() {
             Log.i(TAG, "native endpoint now=${runCatching { Usqueandroid.getEndpoint() }.getOrDefault("")}")
 
             val builder = Builder()
-                .setSession("Usque VPN")
+                .setSession("Usque RU VPN")
                 .setMtu(1280)
                 .addAddress(safeIPv4(configPath), 32)
                 .addDnsServer("1.1.1.1")
@@ -178,7 +178,7 @@ class UsqueVpnService : VpnService() {
     private fun startForegroundCompat() {
         runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val channel = NotificationChannel(CHANNEL_ID, "Usque VPN", NotificationManager.IMPORTANCE_LOW)
+                val channel = NotificationChannel(CHANNEL_ID, "Usque RU VPN", NotificationManager.IMPORTANCE_LOW)
                 getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
             }
             val pendingIntent = PendingIntent.getActivity(
@@ -193,7 +193,7 @@ class UsqueVpnService : VpnService() {
                 @Suppress("DEPRECATION")
                 Notification.Builder(this)
             }
-                .setContentTitle("Usque VPN")
+                .setContentTitle("Usque RU VPN")
                 .setContentText("VPN is running")
                 .setSmallIcon(android.R.drawable.stat_sys_warning)
                 .setContentIntent(pendingIntent)

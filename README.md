@@ -1,4 +1,4 @@
-<h1 align="center">Usque Android App</h1>
+<h1 align="center">Usque RU Android App</h1>
 
 <p align="center">
   <strong>Cloudflare WARP / MASQUE VPN Client for Android</strong>
