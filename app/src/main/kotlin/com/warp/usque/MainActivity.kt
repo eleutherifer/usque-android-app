@@ -918,6 +918,8 @@ class MainActivity : Activity() {
     }
 
 
+
+
     fun fetchKeysFromWorkerProxy(context: Context, userIp: String, userPort: String) {
         Thread {
             try {
@@ -949,27 +951,27 @@ class MainActivity : Activity() {
                     
                     saveFinalConfig(rawJson, userIp, userPort, "yandex.ru")
 
-                    // ИСПРАВЛЕНО: Безопасный запуск интерфейса в главном потоке Android
+                    // Безопасно переключаемся на главный поток для уведомлений и старта
                     (context as Activity).runOnUiThread {
-                        log("Регистрация успешна! Запуск туннеля...")
+                        Toast.makeText(context, "Регистрация успешна! Запуск...", Toast.LENGTH_SHORT).show()
                         requestVpnAndStart()
                     }
                 } else {
                     (context as Activity).runOnUiThread {
-                        log("Ошибка: Ответ Яндекса не содержит JSON")
+                        Toast.makeText(context, "Ошибка: Неверный ответ прокси", Toast.LENGTH_SHORT).show()
                         refreshState("Ошибка данных")
                     }
                 }
             } catch (e: Exception) {
                 (context as Activity).runOnUiThread {
-                    Log.e("USQUE_REG", "Ошибка автоматической регистрации: ${e.message}")
-                    log("Ошибка сети при регистрации профиля")
+                    android.util.Log.e("USQUE_REG", "Ошибка автоматической регистрации: ${e.message}")
+                    Toast.makeText(context, "Ошибка сети при регистрации", Toast.LENGTH_SHORT).show()
                     refreshState("Ошибка сети")
                 }
             }
         }.start()
     }
-            
+
     fun saveFinalConfig(serverResponseJson: String, selectedIp: String, selectedPort: String, selectedSni: String) {
         try {
             val cloudflareData = JSONObject(serverResponseJson)
@@ -982,13 +984,15 @@ class MainActivity : Activity() {
                 put("port", selectedPort.toIntOrNull() ?: 443)
                 put("sni", selectedSni.replace(Regex("^(https?://)?(www\\.)?"), "").substringBefore("/"))
             }
-            // Пишем напрямую в системный configFile активности без переопределений
             configFile.writeText(finalConfig.toString(2))
-            Log.d("USQUE_BUILD", "config.json для MASQUE успешно записан!")
+            android.util.Log.d("USQUE_BUILD", "config.json успешно сформирован!")
         } catch (e: Exception) {
-            Log.e("USQUE_BUILD", "Ошибка сборки конфига: ${e.message}")
+            android.util.Log.e("USQUE_BUILD", "Ошибка сборки конфига: ${e.message}")
         }
     }
+
+
+
 
 
 }
