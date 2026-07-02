@@ -976,22 +976,27 @@ class MainActivity : Activity() {
     fun saveFinalConfig(serverResponseJson: String, selectedIp: String, selectedPort: String, selectedSni: String) {
         try {
             val cloudflareData = JSONObject(serverResponseJson)
+            
+            // СТРОГОЕ СООТВЕТСТВИЕ СТРУКТУРЕ ЯДРА USQUE
             val finalConfig = JSONObject().apply {
                 put("private_key", cloudflareData.getString("privKey"))
-                put("peer_public_key", cloudflareData.getString("cloudflare_pub"))
-                put("interface_v4", cloudflareData.getString("client_ipv4"))
-                put("interface_v6", cloudflareData.getString("client_ipv6"))
+                put("public_key", cloudflareData.getString("cloudflare_pub")) // ИСПРАВЛЕНО: Ключ сервера для MASQUE
+                put("access_token", cloudflareData.optString("token", ""))   // ИСПРАВЛЕНО: Токен авторизации аккаунта
+                put("ipv4", cloudflareData.getString("client_ipv4"))         // ИСПРАВЛЕНО: Внутренний IP без лишних префиксов
+                put("ipv6", cloudflareData.getString("client_ipv6"))         // ИСПРАВЛЕНО: Внутренний IPv6
+                
+                // Параметры для подстановки в сетевой сокет сервиса
                 put("endpoint", selectedIp)
                 put("port", selectedPort.toIntOrNull() ?: 443)
                 put("sni", selectedSni.replace(Regex("^(https?://)?(www\\.)?"), "").substringBefore("/"))
             }
+            
             configFile.writeText(finalConfig.toString(2))
-            android.util.Log.d("USQUE_BUILD", "config.json успешно сформирован!")
+            android.util.Log.d("USQUE_BUILD", "config.json успешно собран под стандарты Go-ядра!")
         } catch (e: Exception) {
             android.util.Log.e("USQUE_BUILD", "Ошибка сборки конфига: ${e.message}")
         }
     }
-
 
 
 
