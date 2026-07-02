@@ -1008,6 +1008,7 @@ class MainActivity : Activity() {
         } catch (e: Exception) {
             android.util.Log.e("USQUE_BUILD", "Ошибка сборки конфига: ${e.message}")
         }
+    }    
 
 
 }
