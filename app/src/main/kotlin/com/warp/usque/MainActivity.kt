@@ -978,26 +978,24 @@ class MainActivity : Activity() {
             val cloudflareData = JSONObject(serverResponseJson)
             
             val finalConfig = JSONObject().apply {
-                // 1. Ключи и токены авторизации забираем из ответа воркера
+                // 1. Ключи и адреса интерфейса (строго под имена переменных в Go-ядре usque)
                 put("private_key", cloudflareData.getString("privKey"))
                 put("public_key", cloudflareData.getString("cloudflare_pub"))
-                put("access_token", cloudflareData.optString("token", ""))
                 put("ipv4", cloudflareData.getString("client_ipv4"))
                 put("ipv6", cloudflareData.getString("client_ipv6"))
                 
-                // 2. Сетевые настройки берем СТРОГО из интерфейса приложения (то, что ввел пользователь)
+                // 2. Сетевые настройки маскировки ТСПУ из интерфейса приложения
                 put("endpoint", selectedIp.trim().ifBlank { "162.159.198.2" })
                 put("port", selectedPort.toIntOrNull()?.takeIf { it > 0 } ?: 443)
                 put("sni", selectedSni.replace(Regex("^(https?://)?(www\\.)?"), "").substringBefore("/").ifBlank { "yandex.ru" })
             }
             
             configFile.writeText(finalConfig.toString(2))
-            android.util.Log.d("USQUE_BUILD", "config.json успешно собран из введенных пользователем данных!")
+            android.util.Log.d("USQUE_BUILD", "config.json для MASQUE успешно сохранен!")
         } catch (e: Exception) {
             android.util.Log.e("USQUE_BUILD", "Ошибка сборки конфига: ${e.message}")
         }
     }
-
 
 
 }
