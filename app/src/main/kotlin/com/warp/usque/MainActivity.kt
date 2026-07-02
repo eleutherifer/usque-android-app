@@ -977,25 +977,33 @@ class MainActivity : Activity() {
         try {
             val cloudflareData = JSONObject(serverResponseJson)
             
+            // ОЧИСТКА IP ОТ СЛЭШЕЙ: Вырезаем маски /32 и /128, оставляя только чистые адреса
+            val rawIpv4 = cloudflareData.getString("client_ipv4")
+            val cleanIpv4 = if (rawIpv4.contains("/")) rawIpv4.substringBefore("/") else rawIpv4
+
+            val rawIpv6 = cloudflareData.getString("client_ipv6")
+            val cleanIpv6 = if (rawIpv6.contains("/")) rawIpv6.substringBefore("/") else rawIpv6
+
             val finalConfig = JSONObject().apply {
-                // 1. Ключи и адреса интерфейса (строго под имена переменных в Go-ядре usque)
+                // 1. Криптографические ключи для MASQUE
                 put("private_key", cloudflareData.getString("privKey"))
                 put("public_key", cloudflareData.getString("cloudflare_pub"))
-                put("ipv4", cloudflareData.getString("client_ipv4"))
-                put("ipv6", cloudflareData.getString("client_ipv6"))
                 
-                // 2. Сетевые настройки маскировки ТСПУ из интерфейса приложения
+                // 2. Очищенные от слэшей внутренние IP (То, что ждет UsqueVpnService)
+                put("ipv4", cleanIpv4.trim())
+                put("ipv6", cleanIpv6.trim())
+                
+                // 3. Сетевые параметры маскировки ТСПУ из интерфейса
                 put("endpoint", selectedIp.trim().ifBlank { "162.159.198.2" })
                 put("port", selectedPort.toIntOrNull()?.takeIf { it > 0 } ?: 443)
                 put("sni", selectedSni.replace(Regex("^(https?://)?(www\\.)?"), "").substringBefore("/").ifBlank { "yandex.ru" })
             }
             
             configFile.writeText(finalConfig.toString(2))
-            android.util.Log.d("USQUE_BUILD", "config.json для MASQUE успешно сохранен!")
+            android.util.Log.d("USQUE_BUILD", "config.json успешно очищен от слэшей под стандарты Android!")
         } catch (e: Exception) {
             android.util.Log.e("USQUE_BUILD", "Ошибка сборки конфига: ${e.message}")
         }
     }
-
 
 }
